@@ -6,9 +6,9 @@ dotenv.config({ path: path.join(__dirname, "../../.env") });
 
 export const config = {
   // Server
-  nodeEnv: process.env.NODE_ENV,
+  nodeEnv: process.env.NODE_ENV || "development",
   port: parseInt(process.env.PORT || "5000", 10),
-  apiVersion: process.env.API_VERSION,
+  apiVersion: process.env.API_VERSION || "v1",
 
   // Database
   db: {
@@ -28,10 +28,10 @@ export const config = {
 
   // JWT
   jwt: {
-    secret: process.env.JWT_SECRET,
-    expiresIn: process.env.JWT_EXPIRES_IN,
-    refreshSecret: process.env.JWT_REFRESH_SECRET,
-    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN,
+    secret: process.env.JWT_SECRET || "default_secret_change_me",
+    expiresIn: process.env.JWT_EXPIRES_IN || "7d",
+    refreshSecret: process.env.JWT_REFRESH_SECRET || "default_refresh_secret",
+    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "30d",
   },
 
   // Rate Limiting
