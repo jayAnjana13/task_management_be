@@ -12,6 +12,8 @@ export const config = {
 
   // Database
   db: {
+    url: process.env.DATABASE_URL || undefined,
+    ssl: (process.env.DB_SSL === 'true') || (process.env.DATABASE_URL?.includes('sslmode=require') ?? false),
     host: process.env.DB_HOST,
     port: parseInt(process.env.DB_PORT || "5432", 10),
     name: process.env.DB_NAME,
