@@ -35,15 +35,23 @@ export function initializeSocketIO(httpServer: HttpServer): SocketServer {
   const io = new SocketServer(httpServer, {
     cors: {
       origin: (origin, callback) => {
+        // Allow requests with no origin
+        if (!origin) {
+          callback(null, true);
+          return;
+        }
+
         if (isAllowedOrigin(origin)) {
           callback(null, true);
           return;
         }
 
-        callback(new Error('Not allowed by CORS'));
+        console.warn(`Socket.IO CORS blocked origin: ${origin}`);
+        callback(new Error(`Not allowed by CORS: ${origin}`));
       },
       methods: ['GET', 'POST'],
       credentials: true,
+      allowedHeaders: ['Authorization', 'Content-Type'],
     },
     pingTimeout: 60000,
     pingInterval: 25000,
