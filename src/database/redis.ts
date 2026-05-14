@@ -1,37 +1,54 @@
 import Redis from 'ioredis';
 import { config } from '../config';
 
-// Create Redis client
-const redis = new Redis({
-  host: config.redis.host,
-  port: config.redis.port,
-  password: config.redis.password || undefined,
-  retryStrategy: (times: number) => {
-    if (times > 3) {
-      console.error('Redis connection failed after 3 retries');
-      return null;
-    }
-    return Math.min(times * 200, 2000);
-  },
-  maxRetriesPerRequest: 3,
-});
+// Determine if Redis should be enabled
+const isRedisEnabled = config.redis.host !== 'localhost' || config.nodeEnv === 'development';
 
-redis.on('connect', () => {
-  console.log('Redis connected');
-});
+// Create Redis client only if enabled
+let redis: Redis | null = null;
 
-redis.on('error', (err: Error) => {
-  console.error('Redis error:', err.message);
-});
+if (isRedisEnabled) {
+  redis = new Redis({
+    host: config.redis.host,
+    port: config.redis.port,
+    password: config.redis.password || undefined,
+    retryStrategy: (times: number) => {
+      if (times > 3) {
+        console.error('Redis connection failed after 3 retries. Running without cache.');
+        return null;
+      }
+      return Math.min(times * 200, 2000);
+    },
+    maxRetriesPerRequest: 3,
+    lazyConnect: true, // Don't connect immediately
+  });
 
-redis.on('close', () => {
-  console.log('Redis connection closed');
-});
+  redis.on('connect', () => {
+    console.log('✓ Redis connected');
+  });
+
+  redis.on('error', (err: Error) => {
+    console.warn('Redis error:', err.message, '- Running without cache');
+  });
+
+  redis.on('close', () => {
+    console.log('Redis connection closed');
+  });
+
+  // Try to connect
+  redis.connect().catch((err) => {
+    console.warn('Redis connection failed:', err.message, '- Running without cache');
+    redis = null;
+  });
+} else {
+  console.log('⚠ Redis disabled - Running without cache (using localhost in production)');
+}
 
 // Cache helper functions
 export const cache = {
   // Get cached value
   async get<T>(key: string): Promise<T | null> {
+    if (!redis) return null;
     try {
       const data = await redis.get(key);
       return data ? JSON.parse(data) : null;
@@ -43,6 +60,7 @@ export const cache = {
 
   // Set cache with expiration (default 5 minutes)
   async set(key: string, value: any, ttlSeconds: number = 300): Promise<void> {
+    if (!redis) return;
     try {
       await redis.setex(key, ttlSeconds, JSON.stringify(value));
     } catch (error) {
@@ -52,6 +70,7 @@ export const cache = {
 
   // Delete cache
   async del(key: string): Promise<void> {
+    if (!redis) return;
     try {
       await redis.del(key);
     } catch (error) {
@@ -61,6 +80,7 @@ export const cache = {
 
   // Delete cache by pattern
   async delByPattern(pattern: string): Promise<void> {
+    if (!redis) return;
     try {
       const keys = await redis.keys(pattern);
       if (keys.length > 0) {
@@ -73,6 +93,7 @@ export const cache = {
 
   // Check if key exists
   async exists(key: string): Promise<boolean> {
+    if (!redis) return false;
     try {
       return (await redis.exists(key)) === 1;
     } catch (error) {
@@ -83,6 +104,7 @@ export const cache = {
 
   // Get TTL for a key
   async ttl(key: string): Promise<number> {
+    if (!redis) return -1;
     try {
       return await redis.ttl(key);
     } catch (error) {
@@ -93,6 +115,7 @@ export const cache = {
 
   // Flush all cache (use with caution)
   async flush(): Promise<void> {
+    if (!redis) return;
     try {
       await redis.flushdb();
     } catch (error) {
@@ -112,6 +135,7 @@ export function generateCacheKey(prefix: string, params: Record<string, any>): s
 
 // Health check
 export async function checkRedisHealth(): Promise<boolean> {
+  if (!redis) return false;
   try {
     const pong = await redis.ping();
     return pong === 'PONG';
@@ -122,8 +146,13 @@ export async function checkRedisHealth(): Promise<boolean> {
 
 // Close Redis connection
 export async function closeRedis(): Promise<void> {
-  await redis.quit();
-  console.log('Redis connection closed');
+  if (!redis) return;
+  try {
+    await redis.quit();
+    console.log('Redis connection closed');
+  } catch (error) {
+    console.warn('Error closing Redis:', error);
+  }
 }
 
 export { redis };
