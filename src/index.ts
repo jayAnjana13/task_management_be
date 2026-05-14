@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { createServer } from 'http';
 
-import { config } from './config';
+import { config, isAllowedOrigin } from './config';
 import { checkDatabaseHealth, checkRedisHealth, closePool, closeRedis } from './database';
 import { notFoundHandler, errorHandler, asyncHandler } from './middleware/errorHandler';
 import { apiRateLimiter } from './middleware/rateLimiter';
@@ -32,7 +32,14 @@ app.use(helmet());
 // CORS configuration
 app.use(
   cors({
-    origin: config.corsOrigin,
+    origin: (origin, callback) => {
+      if (isAllowedOrigin(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
