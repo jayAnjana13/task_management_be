@@ -3,11 +3,13 @@ import path from "path";
 
 // Load environment variables
 dotenv.config({ path: path.join(__dirname, "../../.env") });
+const normalizeOrigin = (origin: string): string => origin.trim().replace(/\/+$/, '');
+
 const parseCorsOrigins = (value?: string): string[] => {
-  const raw = value || 'http://localhost:3000';
+  const raw = value || 'http://localhost:3000,http://localhost:3001,https://task-management-ui-beta.vercel.app';
   return raw
     .split(',')
-    .map((origin) => origin.trim())
+    .map((origin) => normalizeOrigin(origin))
     .filter(Boolean);
 };
 
@@ -15,7 +17,7 @@ const corsOrigins = parseCorsOrigins(process.env.CORS_ORIGIN);
 
 export const isAllowedOrigin = (origin?: string): boolean => {
   if (!origin) return true;
-  return corsOrigins.includes(origin);
+  return corsOrigins.includes(normalizeOrigin(origin));
 };
 
 export const config = {
