@@ -1,5 +1,13 @@
-import { Pool, PoolClient, QueryResult } from "pg";
-import { config } from "../config";
+import { Pool, PoolClient, QueryResult } from 'pg';
+import { config } from '../config';
+
+// Log database configuration (without sensitive data)
+if (config.db.url) {
+  const urlObj = new URL(config.db.url);
+  console.log(`Database: Using DATABASE_URL with host ${urlObj.hostname}`);
+} else {
+  console.log(`Database: Using individual settings with host ${config.db.host}:${config.db.port}`);
+}
 
 // Create PostgreSQL connection pool
 const pool = config.db.url 
@@ -12,46 +20,45 @@ const pool = config.db.url
     keepAlive: true,
     keepAliveInitialDelayMillis: 10000,
   })
-  :  new Pool({
-  host: config.db.host,
-  port: config.db.port,
-  database: config.db.name,
-  user: config.db.user,
-  password: config.db.password,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
+  : new Pool({
+    host: config.db.host,
+    port: config.db.port,
+    database: config.db.name,
+    user: config.db.user,
+    password: config.db.password,
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
+  });
 
 // Log connection events
-pool.on("connect", () => {
-  console.log("Database client connected");
+pool.on('connect', () => {
+  console.log('Database client connected');
 });
 
-pool.on("error", (err: Error) => {
-  console.error("Unexpected database error:", err);
-  process.exit(-1);
+pool.on('error', (err: Error) => {
+  console.error('Unexpected database error:', err);
+  // Don't exit immediately in production to allow for retry mechanisms
+  if (config.nodeEnv === 'development') {
+    process.exit(-1);
+  }
 });
 
 // Query helper function
 export async function query(
   text: string,
-  params?: any[],
+  params?: any[]
 ): Promise<QueryResult> {
   const start = Date.now();
   try {
     const result = await pool.query(text, params);
     const duration = Date.now() - start;
-    if (config.nodeEnv === "development") {
-      console.log("Query executed:", {
-        text: text.substring(0, 50),
-        duration,
-        rows: result.rowCount,
-      });
+    if (config.nodeEnv === 'development') {
+      console.log('Query executed:', { text: text.substring(0, 50), duration, rows: result.rowCount });
     }
     return result;
   } catch (error) {
-    console.error("Database query error:", error);
+    console.error('Database query error:', error);
     throw error;
   }
 }
@@ -73,7 +80,7 @@ export async function getClient(): Promise<PoolClient> {
   // Override release to prevent double release
   const release = () => {
     if (released) {
-      console.warn("Client already released");
+      console.warn('Client already released');
       return;
     }
     released = true;
@@ -85,16 +92,16 @@ export async function getClient(): Promise<PoolClient> {
 
 // Transaction helper
 export async function withTransaction<T>(
-  callback: (client: PoolClient) => Promise<T>,
+  callback: (client: PoolClient) => Promise<T>
 ): Promise<T> {
   const client = await getClient();
   try {
-    await client.query("BEGIN");
+    await client.query('BEGIN');
     const result = await callback(client);
-    await client.query("COMMIT");
+    await client.query('COMMIT');
     return result;
   } catch (error) {
-    await client.query("ROLLBACK");
+    await client.query('ROLLBACK');
     throw error;
   } finally {
     client.release();
@@ -104,7 +111,7 @@ export async function withTransaction<T>(
 // Health check
 export async function checkDatabaseHealth(): Promise<boolean> {
   try {
-    await query("SELECT 1");
+    await query('SELECT 1');
     return true;
   } catch {
     return false;
@@ -114,7 +121,7 @@ export async function checkDatabaseHealth(): Promise<boolean> {
 // Close pool
 export async function closePool(): Promise<void> {
   await pool.end();
-  console.log("Database pool closed");
+  console.log('Database pool closed');
 }
 
 export { pool };
