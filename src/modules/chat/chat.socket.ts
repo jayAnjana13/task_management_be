@@ -1,7 +1,7 @@
 import { Server as SocketServer, Socket } from 'socket.io';
 import { Server as HttpServer } from 'http';
 import jwt from 'jsonwebtoken';
-import { config } from '../../config';
+import { config, isAllowedOrigin } from '../../config';
 import { chatService, Message } from './chat.service';
 import { projectService } from '../project/project.service';
 import { query } from '../../database';
@@ -34,7 +34,14 @@ const projectUsers = new Map<string, Set<string>>();
 export function initializeSocketIO(httpServer: HttpServer): SocketServer {
   const io = new SocketServer(httpServer, {
     cors: {
-      origin: config.corsOrigin,
+      origin: (origin, callback) => {
+        if (isAllowedOrigin(origin)) {
+          callback(null, true);
+          return;
+        }
+
+        callback(new Error('Not allowed by CORS'));
+      },
       methods: ['GET', 'POST'],
       credentials: true,
     },
