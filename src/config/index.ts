@@ -3,6 +3,20 @@ import path from "path";
 
 // Load environment variables
 dotenv.config({ path: path.join(__dirname, "../../.env") });
+const parseCorsOrigins = (value?: string): string[] => {
+  const raw = value || 'http://localhost:3000';
+  return raw
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+};
+
+const corsOrigins = parseCorsOrigins(process.env.CORS_ORIGIN);
+
+export const isAllowedOrigin = (origin?: string): boolean => {
+  if (!origin) return true;
+  return corsOrigins.includes(origin);
+};
 
 export const config = {
   // Server
@@ -43,7 +57,7 @@ export const config = {
   },
 
   // CORS
-  corsOrigin: process.env.CORS_ORIGIN,
+  corsOrigins,
 
   // Pagination
   pagination: {
