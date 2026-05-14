@@ -2,7 +2,10 @@ import Redis from 'ioredis';
 import { config } from '../config';
 
 // Determine if Redis should be enabled
-const isRedisEnabled = config.redis.host !== 'localhost' || config.nodeEnv === 'development';
+// Only enable in development with localhost, or in production with explicit Redis host
+const isRedisEnabled = 
+  (config.nodeEnv === 'development' && config.redis.host === 'localhost') ||
+  (config.nodeEnv === 'production' && config.redis.host && config.redis.host !== 'localhost');
 
 // Create Redis client only if enabled
 let redis: Redis | null = null;
