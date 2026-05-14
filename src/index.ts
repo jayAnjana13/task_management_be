@@ -90,7 +90,8 @@ app.get('/health', asyncHandler(async (_req, res) => {
   const dbHealthy = await checkDatabaseHealth();
   const redisHealthy = await checkRedisHealth();
 
-  const status = dbHealthy && redisHealthy ? 'healthy' : 'unhealthy';
+  // Consider healthy if database is connected (Redis is optional)
+  const status = dbHealthy ? 'healthy' : 'unhealthy';
   const statusCode = status === 'healthy' ? 200 : 503;
 
   res.status(statusCode).json({
@@ -98,7 +99,7 @@ app.get('/health', asyncHandler(async (_req, res) => {
     timestamp: new Date().toISOString(),
     services: {
       database: dbHealthy ? 'connected' : 'disconnected',
-      redis: redisHealthy ? 'connected' : 'disconnected',
+      redis: redisHealthy ? 'connected' : 'disabled',
     },
     version: config.apiVersion,
   });
@@ -129,8 +130,35 @@ app.use(errorHandler);
 // Start server
 const PORT = config.port;
 
-httpServer.listen(PORT, () => {
-  console.log(`
+// Verify database connection before starting server
+const startServer = async () => {
+  try {
+    console.log('Checking database connection...');
+    const dbHealthy = await checkDatabaseHealth();
+    
+    if (!dbHealthy) {
+      console.error('❌ Failed to connect to database. Please check your DATABASE_URL environment variable.');
+      console.error('Available config:', {
+        hasUrl: !!config.db.url,
+        host: config.db.host,
+        port: config.db.port,
+        database: config.db.name,
+      });
+      process.exit(1);
+    }
+    
+    console.log('✓ Database connection verified');
+    
+    // Check Redis (optional)
+    const redisHealthy = await checkRedisHealth();
+    if (redisHealthy) {
+      console.log('✓ Redis connection verified');
+    } else {
+      console.log('⚠ Redis not available - Running without cache');
+    }
+    
+    httpServer.listen(PORT, () => {
+      console.log(`
 ╔═════════════════════════════════════════════════════════════╗
 ║                                                             ║
 ║   Task Management API Server                                ║
@@ -151,8 +179,15 @@ httpServer.listen(PORT, () => {
 ║   WebSocket: ws://localhost:${PORT}                         ║
 ║                                                             ║
 ╚═════════════════════════════════════════════════════════════╝
-  `);
-});
+      `);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
 
 // Graceful shutdown
 const gracefulShutdown = async (signal: string) => {
