@@ -104,6 +104,14 @@ app.get('/health', asyncHandler(async (_req, res) => {
   });
 }));
 
+// CORS debug endpoint
+app.get('/cors-config', (_req, res) => {
+  res.json({
+    allowedOrigins: config.corsOrigins,
+    nodeEnv: config.nodeEnv,
+  });
+});
+
 // API routes
 app.use(`${API_PREFIX}/auth`, authRoutes);
 app.use(`${API_PREFIX}/users`, userRoutes);
