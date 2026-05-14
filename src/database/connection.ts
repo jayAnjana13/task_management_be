@@ -2,7 +2,17 @@ import { Pool, PoolClient, QueryResult } from "pg";
 import { config } from "../config";
 
 // Create PostgreSQL connection pool
-const pool = new Pool({
+const pool = config.db.url 
+  ? new Pool({ 
+    connectionString: config.db.url,
+    ssl: config.db.ssl ? { rejectUnauthorized: false } : undefined,
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 15000,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10000,
+  })
+  :  new Pool({
   host: config.db.host,
   port: config.db.port,
   database: config.db.name,
